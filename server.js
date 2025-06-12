@@ -250,7 +250,96 @@ app.get('/list', (req, res) => {
   
   res.json({message: list});
 });
+// StreamElements için temiz mesaj endpoint'leri
+app.get('/se-open', (req, res) => {
+  predictions = {};
+  gameState = 'open';
+  gameId++;
+  res.send(`🎯 X Tahmin Yarışması #${gameId} Başladı! 🎯\nSlot oyunundan kaç X çıkacağını tahmin edin!\nKomut: !tahmin [sayı] (Örnek: !tahmin 50)`);
+});
 
+app.get('/se-predict', (req, res) => {
+  const username = req.query.username;
+  const prediction = parseFloat(req.query.prediction);
+  
+  if (gameState !== 'open') {
+    return res.send('Tahmin sistemi şu anda kapalı!');
+  }
+  
+  if (isNaN(prediction) || prediction <= 0) {
+    return res.send(`${username} geçersiz tahmin! Pozitif sayı girin.`);
+  }
+  
+  if (predictions[username]) {
+    return res.send(`${username} zaten tahmin yaptınız! (${predictions[username].prediction}x)`);
+  }
+  
+  predictions[username] = {
+    prediction: prediction,
+    timestamp: Date.now()
+  };
+  
+  res.send(`${username} ${prediction}x tahmini kaydedildi! 🎯 Toplam tahmin: ${Object.keys(predictions).length}`);
+});
+
+app.get('/se-close', (req, res) => {
+  if (gameState === 'closed') {
+    return res.send('Tahminler zaten kapalı!');
+  }
+  
+  gameState = 'closed';
+  const totalPredictions = Object.keys(predictions).length;
+  res.send(`⛔ TAHMİNLER KAPANDI! ⛔\n${totalPredictions} tahmin alındı. Satın alım başlıyor... 🎰`);
+});
+
+app.get('/se-result', (req, res) => {
+  const actualResult = parseFloat(req.query.result);
+  
+  if (isNaN(actualResult)) {
+    return res.send('Geçersiz sonuç değeri!');
+  }
+  
+  if (Object.keys(predictions).length === 0) {
+    return res.send('Hiç tahmin yapılmadı!');
+  }
+  
+  let winner = null;
+  let winnerPrediction = 0;
+  let exactMatch = false;
+  let closestDiff = Infinity;
+  let earliestTime = Infinity;
+  
+  for (const [user, data] of Object.entries(predictions)) {
+    if (data.prediction === actualResult) {
+      winner = user;
+      winnerPrediction = data.prediction;
+      exactMatch = true;
+      break;
+    }
+  }
+  
+  if (!exactMatch) {
+    for (const [user, data] of Object.entries(predictions)) {
+      const diff = Math.abs(data.prediction - actualResult);
+      
+      if (diff < closestDiff || (diff === closestDiff && data.timestamp < earliestTime)) {
+        closestDiff = diff;
+        winner = user;
+        winnerPrediction = data.prediction;
+        earliestTime = data.timestamp;
+      }
+    }
+  }
+  
+  predictions = {};
+  gameState = 'closed';
+  
+  const resultMessage = exactMatch 
+    ? `🎯 SONUÇ: ${actualResult}x çıktı! 🎯\n🏆 TAM İSABET! Kazanan: ${winner} (${winnerPrediction}x) 🏆\nMükemmel tahmin! 🎉`
+    : `🏆 SONUÇ: ${actualResult}x çıktı! 🏆\nKazanan: ${winner} (Tahmin: ${winnerPrediction}x, Fark: ${closestDiff.toFixed(1)})\nTebrikler! 🎉`;
+  
+  res.send(resultMessage);
+});
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
   console.log(`Tahmin bot servisi ${port} portunda çalışıyor!`);
