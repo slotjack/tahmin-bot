@@ -281,8 +281,16 @@ app.get('/se-open', (req, res) => {
 
 app.get('/se-predict', (req, res) => {
   try {
-    const username = req.query.username || 'Bilinmeyen';
-    const prediction = parseFloat(req.query.prediction);
+    const usernameRaw = req.query.username || 'Bilinmeyen';
+    const predictionRaw = req.query.prediction;
+    
+    // Username'i temizle - StreamElements bazen obje gönderiyor
+    let username = usernameRaw;
+    if (typeof usernameRaw === 'string' && usernameRaw.includes('[object')) {
+      username = 'Viewer';
+    }
+    
+    const prediction = parseFloat(predictionRaw);
     
     res.set({
       'Content-Type': 'text/plain; charset=utf-8',
@@ -294,8 +302,13 @@ app.get('/se-predict', (req, res) => {
       return res.status(200).send('Tahmin sistemi şu anda kapalı!');
     }
     
+    // Debug için - hem username hem prediction'ı göster
+    if (!predictionRaw) {
+      return res.status(200).send(`${username} tahmin değeri eksik! Kullanım: !tahmin [sayı] (Debug: user="${usernameRaw}", pred="${predictionRaw}")`);
+    }
+    
     if (isNaN(prediction) || prediction <= 0) {
-      return res.status(200).send(`${username} geçersiz tahmin! Pozitif sayı girin.`);
+      return res.status(200).send(`${username} geçersiz tahmin! (Debug: user="${usernameRaw}", pred="${predictionRaw}") Pozitif sayı girin.`);
     }
     
     if (predictions[username]) {
@@ -404,7 +417,19 @@ app.get('/health', (req, res) => {
   });
 });
 
-const port = process.env.PORT || 3000;
+// Render için timeout ayarları
+app.use((req, res, next) => {
+  res.timeout(10000); // 10 saniye timeout
+  next();
+});
+
+// Keep-alive endpoint (Render'da uykuya geçmeyi önlemek için)
+app.get('/ping', (req, res) => {
+  res.status(200).send('pong');
+});
+
+const port = process.env.PORT || 10000;
 app.listen(port, '0.0.0.0', () => {
   console.log(`Tahmin bot servisi ${port} portunda çalışıyor!`);
+  console.log(`Render environment: ${process.env.RENDER || 'local'}`);
 });
