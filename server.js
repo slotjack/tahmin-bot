@@ -46,7 +46,7 @@ app.get('/open', (req, res) => {
   gameState = 'open';
   gameId++;
   res.json({
-    message: `🎯 X Tahmin Yarışması #${gameId} Başladı! 🎯\nSlot oyunundan kaç X çıkacağını tahmin edin!\nKomut: !tahmin [sayı] (Örnek: !tahmin 50)`
+    message: `🎯 X Tahmin Yarışması #${gameId} Başladı! 🎯\nSlot oyunundan kaç X çıkacağını tahmin edizzn!\nKomut: !tahmin [sayı] (Örnek: !tahmin 50)`
   });
 });
 
