@@ -46,7 +46,7 @@ app.get('/open', (req, res) => {
   gameState = 'open';
   gameId++;
   res.json({
-    message: `🎯 X Tahmin Yarışması #${gameId} Başladı! 🎯\nSlot oyunundan kaç X çıkacağını tahmin edizzn!\nKomut: !tahmin [sayı] (Örnek: !tahmin 50)`
+    message: `🎯 X Tahmin Yarışması #${gameId} Başladı! 🎯\nSlot oyunundan kaç X çıkacağını tahmin edin!\nKomut: !tahmin [sayı] (Örnek: !tahmin 50)`
   });
 });
 
@@ -73,7 +73,9 @@ app.post('/predict', (req, res) => {
     timestamp: Date.now()
   };
   
-  
+  res.json({
+    message: `${username} ${prediction}x tahmini kaydedildi! 🎯 Toplam tahmin: ${Object.keys(predictions).length}`
+  });
 });
 
 // Tahmin yapma - GET versiyonu (StreamElements için)
@@ -99,7 +101,9 @@ app.get('/predict', (req, res) => {
     timestamp: Date.now()
   };
   
-  
+  res.json({
+    message: `${username} ${prediction}x tahmini kaydedildi! 🎯 Toplam tahmin: ${Object.keys(predictions).length}`
+  });
 });
 
 // Tahmin kapama - POST versiyonu
@@ -275,6 +279,7 @@ app.get('/se-open', (req, res) => {
   }
 });
 
+// GÜNCELLENMIŞ SESSİZ TAHMİN ENDPOİNTİ
 app.get('/se-predict', (req, res) => {
   try {
     const username = req.query.username || 'Bilinmeyen';
@@ -286,6 +291,7 @@ app.get('/se-predict', (req, res) => {
       'Access-Control-Allow-Origin': '*'
     });
     
+    // Sadece hata durumlarında mesaj döndür
     if (gameState !== 'open') {
       return res.status(200).send('Tahmin sistemi şu anda kapalı!');
     }
@@ -298,13 +304,14 @@ app.get('/se-predict', (req, res) => {
       return res.status(200).send(`${username} zaten tahmin yaptınız! (${predictions[username].prediction}x)`);
     }
     
+    // Tahmin başarıyla kaydedildi - sessiz kal
     predictions[username] = {
       prediction: prediction,
       timestamp: Date.now()
     };
     
-    const message = `${username} ${prediction}x tahmini kaydedildi! 🎯 Toplam tahmin: ${Object.keys(predictions).length}`;
-    res.status(200).send(message);
+    // Boş string döndür (chatte hiçbir şey görünmez)
+    res.status(200).send('');
   } catch (error) {
     res.status(500).send('Sistem hatası!');
   }
