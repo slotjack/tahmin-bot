@@ -1,435 +1,48 @@
-const express = require('express');
+const express = require("express");
 const app = express();
-app.use(express.json());
+const cors = require("cors");
 
-let predictions = {};
-let gameState = 'closed'; // 'open', 'closed'
-let gameId = 0;
+app.use(cors());
 
-// CORS için - StreamElements için daha geniş ayarlar
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-  res.header('Access-Control-Max-Age', '3600');
-  
-  // OPTIONS preflight request'leri için
-  if (req.method === 'OPTIONS') {
-    res.sendStatus(200);
-  } else {
-    next();
+const predictions = {};
+
+app.get("/", (req, res) => {
+  res.send("SlotJack Prediction System is running!");
+});
+
+app.get("/se-predict", async (req, res) => {
+  const username = (req.query.username || "").toLowerCase();
+  const message = (req.query.message || "").trim();
+
+  // Tahmin "x10", "x15", vs. gibi mi?
+  const match = message.match(/^x(\d{1,3})$/i);
+  if (!match) {
+    return res.send(`@${username}, geçerli bir tahmin için örnek: x20`);
   }
-});
 
-// Ana sayfa (çalışıp çalışmadığını kontrol için)
-app.get('/', (req, res) => {
-  res.json({
-    status: 'Bot çalışıyor!',
-    gameState: gameState,
-    activePredictions: Object.keys(predictions).length
-  });
-});
+  const prediction = parseInt(match[1]);
 
-// Tahmin açma - POST versiyonu
-app.post('/open', (req, res) => {
-  predictions = {};
-  gameState = 'open';
-  gameId++;
-  res.json({
-    message: `🎯 X Tahmin Yarışması #${gameId} Başladı! 🎯\nSlot oyunundan kaç X çıkacağını tahmin edin!\nKomut: !tahmin [sayı] (Örnek: !tahmin 50)`
-  });
-});
-
-// Tahmin açma - GET versiyonu (StreamElements için)
-app.get('/open', (req, res) => {
-  predictions = {};
-  gameState = 'open';
-  gameId++;
-  res.json({
-    message: `🎯 X Tahmin Yarışması #${gameId} Başladı! 🎯\nSlot oyunundan kaç X çıkacağını tahmin edin!\nKomut: !tahmin [sayı] (Örnek: !tahmin 50)`
-  });
-});
-
-// Tahmin yapma - POST versiyonu
-app.post('/predict', (req, res) => {
-  const username = req.body.username;
-  const prediction = parseFloat(req.body.prediction);
-  
-  if (gameState !== 'open') {
-    return res.json({message: 'Tahmin sistemi şu anda kapalı!'});
-  }
-  
-  if (isNaN(prediction) || prediction <= 0) {
-    return res.json({message: `${username} geçersiz tahmin! Pozitif sayı girin.`});
-  }
-  
+  // Zaten tahminde bulunmuş mu?
   if (predictions[username]) {
-    return res.json({message: `${username} zaten tahmin yaptınız! (${predictions[username].prediction}x)`});
+    return res.send(`@${username}, zaten tahminde bulundun.`);
   }
-  
-  // Tahmin ve zaman damgası kaydet
-  predictions[username] = {
-    prediction: prediction,
-    timestamp: Date.now()
-  };
-  
-  res.json({
-    message: `${username} ${prediction}x tahmini kaydedildi! 🎯 Toplam tahmin: ${Object.keys(predictions).length}`
-  });
+
+  predictions[username] = prediction;
+
+  // Başarılı tahmin → sessiz kal
+  return res.send('');
 });
 
-// Tahmin yapma - GET versiyonu (StreamElements için)
-app.get('/predict', (req, res) => {
-  const username = req.query.username;
-  const prediction = parseFloat(req.query.prediction);
-  
-  if (gameState !== 'open') {
-    return res.json({message: 'Tahmin sistemi şu anda kapalı!'});
-  }
-  
-  if (isNaN(prediction) || prediction <= 0) {
-    return res.json({message: `${username} geçersiz tahmin! Pozitif sayı girin.`});
-  }
-  
-  if (predictions[username]) {
-    return res.json({message: `${username} zaten tahmin yaptınız! (${predictions[username].prediction}x)`});
-  }
-  
-  // Tahmin ve zaman damgası kaydet
-  predictions[username] = {
-    prediction: prediction,
-    timestamp: Date.now()
-  };
-  
-  res.json({
-    message: `${username} ${prediction}x tahmini kaydedildi! 🎯 Toplam tahmin: ${Object.keys(predictions).length}`
-  });
+app.get("/reset", (req, res) => {
+  Object.keys(predictions).forEach((key) => delete predictions[key]);
+  res.send("Tahminler sıfırlandı.");
 });
 
-// Tahmin kapama - POST versiyonu
-app.post('/close', (req, res) => {
-  if (gameState === 'closed') {
-    return res.json({message: 'Tahminler zaten kapalı!'});
-  }
-  
-  gameState = 'closed';
-  const totalPredictions = Object.keys(predictions).length;
-  res.json({
-    message: `⛔ TAHMİNLER KAPANDI! ⛔\n${totalPredictions} tahmin alındı. Satın alım başlıyor... 🎰`
-  });
+app.get("/all", (req, res) => {
+  res.json(predictions);
 });
 
-// Tahmin kapama - GET versiyonu (StreamElements için)
-app.get('/close', (req, res) => {
-  if (gameState === 'closed') {
-    return res.json({message: 'Tahminler zaten kapalı!'});
-  }
-  
-  gameState = 'closed';
-  const totalPredictions = Object.keys(predictions).length;
-  res.json({
-    message: `⛔ TAHMİNLER KAPANDI! ⛔\n${totalPredictions} tahmin alındı. Satın alım başlıyor... 🎰`
-  });
-});
-
-// Kazanan belirleme - POST versiyonu
-app.post('/result', (req, res) => {
-  const actualResult = parseFloat(req.body.result);
-  
-  if (isNaN(actualResult)) {
-    return res.json({message: 'Geçersiz sonuç değeri!'});
-  }
-  
-  if (Object.keys(predictions).length === 0) {
-    return res.json({message: 'Hiç tahmin yapılmadı!'});
-  }
-  
-  let winner = null;
-  let winnerPrediction = 0;
-  let exactMatch = false;
-  let closestDiff = Infinity;
-  let earliestTime = Infinity;
-  
-  // Önce tam isabet var mı kontrol et
-  for (const [user, data] of Object.entries(predictions)) {
-    if (data.prediction === actualResult) {
-      winner = user;
-      winnerPrediction = data.prediction;
-      exactMatch = true;
-      break; // Tam isabet bulundu, diğerlerine bakmaya gerek yok
-    }
-  }
-  
-  // Tam isabet yoksa en yakın tahmini bul (ilk yapan kazanır)
-  if (!exactMatch) {
-    for (const [user, data] of Object.entries(predictions)) {
-      const diff = Math.abs(data.prediction - actualResult);
-      
-      // Daha yakın tahmin VEYA aynı mesafede ama daha erken yapılmış
-      if (diff < closestDiff || (diff === closestDiff && data.timestamp < earliestTime)) {
-        closestDiff = diff;
-        winner = user;
-        winnerPrediction = data.prediction;
-        earliestTime = data.timestamp;
-      }
-    }
-  }
-  
-  // Sonraki oyun için sıfırla
-  predictions = {};
-  gameState = 'closed';
-  
-  const resultMessage = exactMatch 
-    ? `🎯 SONUÇ: ${actualResult}x çıktı! 🎯\n🏆 TAM İSABET! Kazanan: ${winner} (${winnerPrediction}x) 🏆\nMükemmel tahmin! 🎉`
-    : `🏆 SONUÇ: ${actualResult}x çıktı! 🏆\nKazanan: ${winner} (Tahmin: ${winnerPrediction}x, Fark: ${closestDiff.toFixed(1)})\nTebrikler! 🎉`;
-  
-  res.json({message: resultMessage});
-});
-
-// Kazanan belirleme - GET versiyonu (StreamElements için)
-app.get('/result', (req, res) => {
-  const actualResult = parseFloat(req.query.result);
-  
-  if (isNaN(actualResult)) {
-    return res.json({message: 'Geçersiz sonuç değeri!'});
-  }
-  
-  if (Object.keys(predictions).length === 0) {
-    return res.json({message: 'Hiç tahmin yapılmadı!'});
-  }
-  
-  let winner = null;
-  let winnerPrediction = 0;
-  let exactMatch = false;
-  let closestDiff = Infinity;
-  let earliestTime = Infinity;
-  
-  // Önce tam isabet var mı kontrol et
-  for (const [user, data] of Object.entries(predictions)) {
-    if (data.prediction === actualResult) {
-      winner = user;
-      winnerPrediction = data.prediction;
-      exactMatch = true;
-      break; // Tam isabet bulundu, diğerlerine bakmaya gerek yok
-    }
-  }
-  
-  // Tam isabet yoksa en yakın tahmini bul (ilk yapan kazanır)
-  if (!exactMatch) {
-    for (const [user, data] of Object.entries(predictions)) {
-      const diff = Math.abs(data.prediction - actualResult);
-      
-      // Daha yakın tahmin VEYA aynı mesafede ama daha erken yapılmış
-      if (diff < closestDiff || (diff === closestDiff && data.timestamp < earliestTime)) {
-        closestDiff = diff;
-        winner = user;
-        winnerPrediction = data.prediction;
-        earliestTime = data.timestamp;
-      }
-    }
-  }
-  
-  // Sonraki oyun için sıfırla
-  predictions = {};
-  gameState = 'closed';
-  
-  const resultMessage = exactMatch 
-    ? `🎯 SONUÇ: ${actualResult}x çıktı! 🎯\n🏆 TAM İSABET! Kazanan: ${winner} (${winnerPrediction}x) 🏆\nMükemmel tahmin! 🎉`
-    : `🏆 SONUÇ: ${actualResult}x çıktı! 🏆\nKazanan: ${winner} (Tahmin: ${winnerPrediction}x, Fark: ${closestDiff.toFixed(1)})\nTebrikler! 🎉`;
-  
-  res.json({message: resultMessage});
-});
-
-// Aktif tahminleri listele (opsiyonel)
-app.get('/list', (req, res) => {
-  if (Object.keys(predictions).length === 0) {
-    return res.json({message: 'Henüz tahmin yapılmadı.'});
-  }
-  
-  let list = 'Mevcut Tahminler:\n';
-  // Zaman sırasına göre sırala (ilk tahmin edenden son tahmin edene)
-  const sortedPredictions = Object.entries(predictions)
-    .sort(([,a], [,b]) => a.timestamp - b.timestamp);
-  
-  for (const [user, data] of sortedPredictions) {
-    list += `${user}: ${data.prediction}x\n`;
-  }
-  
-  res.json({message: list});
-});
-
-// StreamElements için özel endpoint'ler - Optimized
-app.get('/se-open', (req, res) => {
-  try {
-    predictions = {};
-    gameState = 'open';
-    gameId++;
-    
-    // StreamElements için sadece metin response
-    res.set({
-      'Content-Type': 'text/plain; charset=utf-8',
-      'Cache-Control': 'no-cache, no-store, must-revalidate',
-      'Access-Control-Allow-Origin': '*'
-    });
-    
-    const message = `🎯 X Tahmin Yarışması #${gameId} Başladı! 🎯 Slot oyunundan kaç X çıkacağını tahmin edin! Komut: !tahmin [sayı] (Örnek: !tahmin 50)`;
-    res.status(200).send(message);
-  } catch (error) {
-    res.status(500).send('Sistem hatası!');
-  }
-});
-
-app.get('/se-predict', (req, res) => {
-  try {
-    const usernameRaw = req.query.username || 'Bilinmeyen';
-    const predictionRaw = req.query.prediction;
-    
-    // Username'i temizle - StreamElements bazen obje gönderiyor
-    let username = usernameRaw;
-    if (typeof usernameRaw === 'string' && usernameRaw.includes('[object')) {
-      username = 'Viewer';
-    }
-    
-    const prediction = parseFloat(predictionRaw);
-    
-    res.set({
-      'Content-Type': 'text/plain; charset=utf-8',
-      'Cache-Control': 'no-cache',
-      'Access-Control-Allow-Origin': '*'
-    });
-    
-    if (gameState !== 'open') {
-      return res.status(200).send('Tahmin sistemi şu anda kapalı!');
-    }
-    
-    // Debug için - hem username hem prediction'ı göster
-    if (!predictionRaw) {
-      return res.status(200).send(`${username} tahmin değeri eksik! Kullanım: !tahmin [sayı] (Debug: user="${usernameRaw}", pred="${predictionRaw}")`);
-    }
-    
-    if (isNaN(prediction) || prediction <= 0) {
-      return res.status(200).send(`${username} geçersiz tahmin! (Debug: user="${usernameRaw}", pred="${predictionRaw}") Pozitif sayı girin.`);
-    }
-    
-    if (predictions[username]) {
-      return res.status(200).send(`${username} zaten tahmin yaptınız! (${predictions[username].prediction}x)`);
-    }
-    
-    predictions[username] = {
-      prediction: prediction,
-      timestamp: Date.now()
-    };
-    
-    const message = `${username} ${prediction}x tahmini kaydedildi! 🎯 Toplam tahmin: ${Object.keys(predictions).length}`;
-    res.status(200).send(message);
-  } catch (error) {
-    res.status(500).send('Sistem hatası!');
-  }
-});
-
-app.get('/se-close', (req, res) => {
-  try {
-    res.set({
-      'Content-Type': 'text/plain; charset=utf-8',
-      'Cache-Control': 'no-cache',
-      'Access-Control-Allow-Origin': '*'
-    });
-    
-    if (gameState === 'closed') {
-      return res.status(200).send('Tahminler zaten kapalı!');
-    }
-    
-    gameState = 'closed';
-    const totalPredictions = Object.keys(predictions).length;
-    const message = `⛔ TAHMİNLER KAPANDI! ⛔ ${totalPredictions} tahmin alındı. Satın alım başlıyor... 🎰`;
-    res.status(200).send(message);
-  } catch (error) {
-    res.status(500).send('Sistem hatası!');
-  }
-});
-
-app.get('/se-result', (req, res) => {
-  try {
-    const actualResult = parseFloat(req.query.result);
-    
-    res.set({
-      'Content-Type': 'text/plain; charset=utf-8',
-      'Cache-Control': 'no-cache',
-      'Access-Control-Allow-Origin': '*'
-    });
-    
-    if (isNaN(actualResult)) {
-      return res.status(200).send('Geçersiz sonuç değeri!');
-    }
-    
-    if (Object.keys(predictions).length === 0) {
-      return res.status(200).send('Hiç tahmin yapılmadı!');
-    }
-    
-    let winner = null;
-    let winnerPrediction = 0;
-    let exactMatch = false;
-    let closestDiff = Infinity;
-    let earliestTime = Infinity;
-    
-    for (const [user, data] of Object.entries(predictions)) {
-      if (data.prediction === actualResult) {
-        winner = user;
-        winnerPrediction = data.prediction;
-        exactMatch = true;
-        break;
-      }
-    }
-    
-    if (!exactMatch) {
-      for (const [user, data] of Object.entries(predictions)) {
-        const diff = Math.abs(data.prediction - actualResult);
-        
-        if (diff < closestDiff || (diff === closestDiff && data.timestamp < earliestTime)) {
-          closestDiff = diff;
-          winner = user;
-          winnerPrediction = data.prediction;
-          earliestTime = data.timestamp;
-        }
-      }
-    }
-    
-    predictions = {};
-    gameState = 'closed';
-    
-    const resultMessage = exactMatch 
-      ? `🎯 SONUÇ: ${actualResult}x çıktı! 🎯 🏆 TAM İSABET! Kazanan: ${winner} (${winnerPrediction}x) 🏆 Mükemmel tahmin! 🎉`
-      : `🏆 SONUÇ: ${actualResult}x çıktı! 🏆 Kazanan: ${winner} (Tahmin: ${winnerPrediction}x, Fark: ${closestDiff.toFixed(1)}) Tebrikler! 🎉`;
-    
-    res.status(200).send(resultMessage);
-  } catch (error) {
-    res.status(500).send('Sistem hatası!');
-  }
-});
-
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.status(200).json({
-    status: 'healthy',
-    timestamp: new Date().toISOString(),
-    gameState: gameState,
-    predictions: Object.keys(predictions).length
-  });
-});
-
-// Render için timeout ayarları
-app.use((req, res, next) => {
-  res.timeout(10000); // 10 saniye timeout
-  next();
-});
-
-// Keep-alive endpoint (Render'da uykuya geçmeyi önlemek için)
-app.get('/ping', (req, res) => {
-  res.status(200).send('pong');
-});
-
-const port = process.env.PORT || 10000;
-app.listen(port, '0.0.0.0', () => {
-  console.log(`Tahmin bot servisi ${port} portunda çalışıyor!`);
-  console.log(`Render environment: ${process.env.RENDER || 'local'}`);
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server çalışıyor: http://localhost:${PORT}`);
 });
