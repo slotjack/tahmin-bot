@@ -208,7 +208,7 @@ app.post('/result', (req, res) => {
   
   const resultMessage = exactMatch 
     ? `🎯 SONUÇ: ${actualResult}x çıktı! 🎯\n🏆 TAM İSABET! Kazanan: ${winner} (${winnerPrediction}x) 🏆\nMükemmel tahmin! 🎉`
-    : `🏆 SONUÇ: ${actualResult}x çıktı! 🏆\nKazanan: ${winner} (Tahmin: ${winnerPrediction}x, Fark: ${closestDiff.toFixed(1)})\nTebrikler! 🎉`;
+    : `🏆 SONUÇ: ${actualResult}x çıktı! 🏆\n${winnerPrediction}x tahminiyle en yakın tahmini ilk yapan: ${winner}\nTebrikler! 🎉`;
   
   res.json({message: resultMessage});
 });
@@ -277,7 +277,7 @@ app.get('/result', (req, res) => {
   
   const resultMessage = exactMatch 
     ? `🎯 SONUÇ: ${actualResult}x çıktı! 🎯\n🏆 TAM İSABET! Kazanan: ${winner} (${winnerPrediction}x) 🏆\nMükemmel tahmin! 🎉`
-    : `🏆 SONUÇ: ${actualResult}x çıktı! 🏆\nKazanan: ${winner} (Tahmin: ${winnerPrediction}x, Fark: ${closestDiff.toFixed(1)})\nTebrikler! 🎉`;
+    : `🏆 SONUÇ: ${actualResult}x çıktı! 🏆\n${winnerPrediction}x tahminiyle en yakın tahmini ilk yapan: ${winner}\nTebrikler! 🎉`;
   
   res.json({message: resultMessage});
 });
@@ -446,7 +446,7 @@ app.get('/se-result', (req, res) => {
     
     const resultMessage = exactMatch 
       ? `🎯 SONUÇ: ${actualResult}x çıktı! 🎯 🏆 TAM İSABET! Kazanan: ${winner} (${winnerPrediction}x) 🏆 Mükemmel tahmin! 🎉`
-      : `🏆 SONUÇ: ${actualResult}x çıktı! 🏆 Kazanan: ${winner} (Tahmin: ${winnerPrediction}x, Fark: ${closestDiff.toFixed(1)}) Tebrikler! 🎉`;
+      : `🏆 SONUÇ: ${actualResult}x çıktı! 🏆 ${winnerPrediction}x tahminiyle en yakın tahmini ilk yapan: ${winner} Tebrikler! 🎉`;
     
     res.status(200).send(resultMessage);
   } catch (error) {
