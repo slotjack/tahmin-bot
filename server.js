@@ -5,6 +5,7 @@ app.use(express.json());
 let predictions = {};
 let gameState = 'closed'; // 'open', 'closed'
 let gameId = 0;
+let lastWinner = null; // Overlay için kazanan bilgisi
 
 // CORS için - StreamElements için daha geniş ayarlar
 app.use((req, res, next) => {
@@ -28,6 +29,17 @@ app.get('/', (req, res) => {
     gameState: gameState,
     activePredictions: Object.keys(predictions).length
   });
+});
+
+// Overlay için kazanan bilgisi endpoint'i
+app.get('/winner', (req, res) => {
+  res.set({
+    'Content-Type': 'application/json',
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    'Access-Control-Allow-Origin': '*'
+  });
+  
+  res.json({ winner: lastWinner });
 });
 
 // Tahmin açma - POST versiyonu
@@ -175,6 +187,21 @@ app.post('/result', (req, res) => {
     }
   }
   
+  // Kazanan bilgisini overlay için sakla
+  lastWinner = {
+    username: winner,
+    prediction: winnerPrediction,
+    actualResult: actualResult,
+    exactMatch: exactMatch,
+    diff: exactMatch ? 0 : closestDiff,
+    timestamp: Date.now()
+  };
+
+  // 10 saniye sonra temizle
+  setTimeout(() => {
+    lastWinner = null;
+  }, 10000);
+  
   // Sonraki oyun için sıfırla
   predictions = {};
   gameState = 'closed';
@@ -228,6 +255,21 @@ app.get('/result', (req, res) => {
       }
     }
   }
+  
+  // Kazanan bilgisini overlay için sakla
+  lastWinner = {
+    username: winner,
+    prediction: winnerPrediction,
+    actualResult: actualResult,
+    exactMatch: exactMatch,
+    diff: exactMatch ? 0 : closestDiff,
+    timestamp: Date.now()
+  };
+
+  // 10 saniye sonra temizle
+  setTimeout(() => {
+    lastWinner = null;
+  }, 10000);
   
   // Sonraki oyun için sıfırla
   predictions = {};
@@ -383,6 +425,21 @@ app.get('/se-result', (req, res) => {
         }
       }
     }
+    
+    // Kazanan bilgisini overlay için sakla
+    lastWinner = {
+      username: winner,
+      prediction: winnerPrediction,
+      actualResult: actualResult,
+      exactMatch: exactMatch,
+      diff: exactMatch ? 0 : closestDiff,
+      timestamp: Date.now()
+    };
+
+    // 10 saniye sonra temizle
+    setTimeout(() => {
+      lastWinner = null;
+    }, 10000);
     
     predictions = {};
     gameState = 'closed';
